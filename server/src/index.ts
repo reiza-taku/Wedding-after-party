@@ -87,12 +87,20 @@ app.post("/guests/register", (req, res) => {
   }
 
   const trimmedName = name.trim();
-  const result = db.prepare("INSERT INTO guests (name) VALUES (?)").run(trimmedName);
-  const guestId = result.lastInsertRowid;
+  // まず同じ名前のゲストがいないか探す
+  let guest = db
+    .prepare("SELECT id, name FROM guests WHERE name = ?")
+    .get(trimmedName) as { id: number; name: string } | undefined;
+
+  // いなければ新規作成
+  if (!guest) {
+    const result = db.prepare("INSERT INTO guests (name) VALUES (?)").run(trimmedName);
+    guest = { id: Number(result.lastInsertRowid), name: trimmedName };
+  }
 
   // 二次会当日中はログイン状態を保ちたいので有効期限は長め
   const token = jwt.sign(
-    { sub: guestId, name: trimmedName, type: "guest" },
+    { sub: guest.id, name: trimmedName, type: "guest" },
     JWT_SECRET,
     { expiresIn: "24h" }
   );
