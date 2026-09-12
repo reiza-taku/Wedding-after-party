@@ -10,3 +10,11 @@ db.exec(`
     role TEXT NOT NULL CHECK(role IN ('staff', 'manager'))
   );
 `);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS guests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+`);

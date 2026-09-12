@@ -5,9 +5,11 @@ import jwt from "jsonwebtoken";
 
 import { db } from "./db";
 import { createUser, verifyPassword } from "./auth";
+import { requireAuth } from "./auth-middleware";
 
 //Expressアプリの作成（webサーバの設定を集める）
 const app = express();
+const PORT = process.env.PORT;
 const JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET) {
@@ -36,7 +38,10 @@ app.get("/test-user", async (_req, res) => {
   res.json({ message: "created" });
 });
 
-//ユーザー名とパスワードで本人確認を行い、成功した利用者にJWTを返すログインAPI
+/*------------------------------------------
+    ユーザー名とパスワードで本人確認を行い、
+    成功した利用者にJWTを返すログインAPI
+------------------------------------------*/
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
 
@@ -71,8 +76,34 @@ app.post("/login", async (req, res) => {
   res.json({ token });
 });
 
-//環境変数 PORT があればそれを使い、なければ3001番を使う
-const PORT = process.env.PORT;
+/*------------------------------------------
+    ゲスト登録API
+    ゲストの名前を登録し、JWTを返す
+------------------------------------------*/  
+app.post("/guests/register", (req, res) => {
+  const { name } = req.body;
+  if (!name || typeof name !== "string" || name.trim().length === 0) {
+    return res.status(400).json({ error: "name is required" });
+  }
+
+  const trimmedName = name.trim();
+  const result = db.prepare("INSERT INTO guests (name) VALUES (?)").run(trimmedName);
+  const guestId = result.lastInsertRowid;
+
+  // 二次会当日中はログイン状態を保ちたいので有効期限は長め
+  const token = jwt.sign(
+    { sub: guestId, name: trimmedName, type: "guest" },
+    JWT_SECRET,
+    { expiresIn: "24h" }
+  );
+
+  res.json({ token, name: trimmedName });
+});
+
+// 動作確認用の保護されたルート
+app.get("/guests/me", requireAuth, (req, res) => {
+  res.json({ id: req.auth?.sub, name: req.auth?.name });
+});
 
 
 /*------------------------------------------
